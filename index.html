@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard Operatividad de Flota — CARHUAMAYO</title>
+<title>Dashboard Operatividad de Flota — Carhuamayo</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -137,7 +137,7 @@ tr:hover td{background:var(--sur2)}
     <div class="bdg">2026</div>
   </div>
   <div class="tabs">
-    <button class="tab active" onclick="showPage('resumen',this)">Resumen KPI</button>
+    <button class="tab active" onclick="showPage('resumen',this)">Resumen Ejecutivo</button>
     <button class="tab" onclick="showPage('operatividad',this)">Operatividad</button>
     <button class="tab" onclick="showPage('valorizacion',this)">Valorización</button>
     <button class="tab" onclick="showPage('flota',this)">Flota</button>
@@ -226,7 +226,7 @@ tr:hover td{background:var(--sur2)}
   <div class="sep"></div>
   <button class="btn btn-g" onclick="resetFilters()">↺ Limpiar</button>
   <div style="margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-    <button id="btnRefresh" class="btn btn-p" onclick="loadFromSharePoint()" title="Cargar datos actualizados desde SharePoint">🔄 Actualizar</button>
+    <button id="btnRefresh" class="btn btn-p" onclick="loadFromSharePoint()" title="Carga automática desde Google Sheets">🔄 Actualizar</button>
     <label for="fileInput" class="btn btn-g" style="cursor:pointer">📂 Cargar Excel</label>
     <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="loadExcelFile(event)" style="display:none">
     <a href="https://empcarhuamayo-my.sharepoint.com/:x:/p/sramos/IQAHcEG2Y1X4Q6UDEko2w_gkAaTURbR3Sw3SdGg63muQzDs?e=jeH9Jy" target="_blank" class="btn btn-g" title="Abrir archivo en SharePoint">📋 SharePoint</a>
@@ -707,32 +707,39 @@ function renderProjection() {
 //   - Días Op/Inop/Val: count de filas donde op=1 / inop=1 / val='valorizado'
 function renderExecSummary() {
 
-  // ── FLEET COMPOSITION CARD ────────────────────────────────────────────────
+  // ── FLEET COMPOSITION CARD (usa FLEET_DATA global — dinámico) ──────────────
   (function() {
-    var FLEET_DATA = {"CRC":{"total":23,"alquiler":6,"propio":17,"pct_alq":26.1,"placas_alq":["BPZ-811","BKX-788","BFP-881","VBD-813","CJT865","VCW-820"],"placas_pro":["BLG-813","BLH-841","BLJ-916","BSY-760","BMO-824","BNM-857","BNA-754","BML-833","BMN-758","CEU-923","CFD-787","CJH-714","CJH-785","CJH-881","CJJ-709","CJL-877","CLU-822"]},"Camion_Grua":{"total":11,"alquiler":0,"propio":11,"pct_alq":0.0,"placas_alq":[],"placas_pro":["BSB-832","BWC-801","BEG-763","BFR-871","BKE-776","BRH-713","BRJ-742","BZC-719","CDC-719","CKK-761","CLC-743"]},"Cisterna Agua":{"total":2,"alquiler":2,"propio":0,"pct_alq":100.0,"placas_alq":["CDI-864","CFW-811"],"placas_pro":[]},"Camioneta":{"total":4,"alquiler":1,"propio":3,"pct_alq":25.0,"placas_alq":["COMERCIAL"],"placas_pro":["BRY-703","CDE-927","TALLER"]},"Baranda":{"total":2,"alquiler":0,"propio":2,"pct_alq":0.0,"placas_alq":[],"placas_pro":["CLT-869","CLS-882"]},"Minivan":{"total":1,"alquiler":0,"propio":1,"pct_alq":0.0,"placas_alq":[],"placas_pro":["BPX-938"]}};
-    var tipoIcons  = {'CRC':'🚛','Camion_Grua':'🏗️','Cisterna Agua':'💧','Camioneta':'🚙','Baranda':'🚚','Minivan':'🚐'};
-    var tipoLabels = {'CRC':'CRC','Camion_Grua':'Camión Grúa','Cisterna Agua':'Cisterna Agua','Camioneta':'Camioneta','Baranda':'Baranda','Minivan':'Minivan'};
-    var tipos = Object.keys(FLEET_DATA);
-    var totalFlota = tipos.reduce(function(a,t){return a+FLEET_DATA[t].total;},0);
-    var totalAlq   = tipos.reduce(function(a,t){return a+FLEET_DATA[t].alquiler;},0);
-    var pctAlqTotal = totalFlota>0?Math.round(totalAlq/totalFlota*100):0;
+    var d = FLEET_DATA;
+    var TIPO_ORDER  = ['CRC','Camion_Grua','Cisterna Agua','Baranda','Camioneta','Minivan'];
+    var TIPO_LABELS = {'CRC':'CRC','Camion_Grua':'Camión Grúa','Cisterna Agua':'Cisterna Agua','Baranda':'Baranda','Camioneta':'Camioneta','Minivan':'Minivan'};
+    var TIPO_ICONS  = {'CRC':'🚛','Camion_Grua':'🏗️','Cisterna Agua':'💧','Baranda':'🚚','Camioneta':'🚙','Minivan':'🚐'};
 
-    var cards = tipos.map(function(tipo) {
-      var d = FLEET_DATA[tipo];
-      var pAlq = d.total>0?Math.round(d.alquiler/d.total*100):0;
-      var pPro = 100-pAlq;
-      var icon = tipoIcons[tipo]||'🚛';
-      var lbl  = tipoLabels[tipo]||tipo;
-      var tipAlq = d.placas_alq.length>0?d.placas_alq.join(', '):'—';
-      var tipPro = d.placas_pro.length>0?d.placas_pro.join(', '):'—';
-      var alqColor = pAlq>0?'var(--rd)':'var(--tx2)';
-      var alqBg    = pAlq>0?'rgba(248,81,73,.08)':'rgba(63,185,80,.04)';
-      var alqBrd   = pAlq>0?'rgba(248,81,73,.2)':'rgba(63,185,80,.1)';
+    var tipos = TIPO_ORDER.filter(function(t){ return d[t] && d[t].total > 0; });
+    // Append any tipos in data not in our order list
+    Object.keys(d).forEach(function(t){
+      if(tipos.indexOf(t)===-1 && d[t].total>0) tipos.push(t);
+    });
+
+    var totalFlota = tipos.reduce(function(a,t){return a+(d[t]?d[t].total:0);},0);
+    var totalAlq   = tipos.reduce(function(a,t){return a+(d[t]?d[t].alquiler:0);},0);
+    var pctAlqT    = totalFlota>0?Math.round(totalAlq/totalFlota*100):0;
+
+    var cards = tipos.map(function(tipo){
+      var info    = d[tipo]||{total:0,alquiler:0,propio:0,placas_alq:[],placas_pro:[]};
+      var pAlq    = info.total>0?Math.round(info.alquiler/info.total*100):0;
+      var pPro    = 100-pAlq;
+      var icon    = TIPO_ICONS[tipo]||'🚛';
+      var lbl     = TIPO_LABELS[tipo]||tipo;
+      var tipAlq  = info.placas_alq&&info.placas_alq.length>0?info.placas_alq.join(', '):'—';
+      var tipPro  = info.placas_pro&&info.placas_pro.length>0?info.placas_pro.join(', '):'—';
+      var alqCol  = pAlq>0?'var(--rd)':'var(--tx2)';
+      var alqBg   = pAlq>0?'rgba(248,81,73,.08)':'rgba(63,185,80,.04)';
+      var alqBrd  = pAlq>0?'rgba(248,81,73,.2)':'rgba(63,185,80,.1)';
       return '<div style="background:var(--sur2);border:1px solid var(--brd);border-radius:10px;padding:14px">'
         +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
           +'<span style="font-size:20px">'+icon+'</span>'
           +'<div><div style="font-size:12px;font-weight:700">'+lbl+'</div>'
-          +'<div style="font-size:10px;color:var(--tx2)">'+d.total+' unidades activas</div></div>'
+          +'<div style="font-size:10px;color:var(--tx2)">'+info.total+' unidades activas</div></div>'
         +'</div>'
         +'<div style="margin-bottom:8px">'
           +'<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--tx2);margin-bottom:4px">'
@@ -742,21 +749,21 @@ function renderExecSummary() {
             +'<div style="display:flex;height:100%">'
               +'<div style="width:'+pPro+'%;background:var(--gr);border-radius:4px 0 0 4px"></div>'
               +(pAlq>0?'<div style="width:'+pAlq+'%;background:var(--rd);border-radius:0 4px 4px 0"></div>':'')
-            +'</div>'
-          +'</div>'
+            +'</div></div>'
         +'</div>'
         +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'
           +'<div style="text-align:center;background:rgba(63,185,80,.08);border:1px solid rgba(63,185,80,.2);border-radius:6px;padding:6px" title="Propios: '+tipPro+'">'
-            +'<div style="font-size:18px;font-weight:800;color:var(--gr)">'+d.propio+'</div>'
+            +'<div style="font-size:18px;font-weight:800;color:var(--gr)">'+info.propio+'</div>'
             +'<div style="font-size:9px;color:var(--tx2);text-transform:uppercase">Propios</div>'
           +'</div>'
           +'<div style="text-align:center;background:'+alqBg+';border:1px solid '+alqBrd+';border-radius:6px;padding:6px" title="Alquilados: '+tipAlq+'">'
-            +'<div style="font-size:18px;font-weight:800;color:'+alqColor+'">'+d.alquiler+'</div>'
+            +'<div style="font-size:18px;font-weight:800;color:'+alqCol+'">'+info.alquiler+'</div>'
             +'<div style="font-size:9px;color:var(--tx2);text-transform:uppercase">Alquilados</div>'
           +'</div>'
         +'</div>'
         +'<div style="text-align:center;font-size:11px;color:var(--tx2)">'
-          +(pAlq>0?'<span style="color:var(--rd);font-weight:700">'+pAlq+'%</span> alquilado':'<span style="color:var(--gr);font-weight:700">100%</span> propio')
+          +(pAlq>0?'<span style="color:var(--rd);font-weight:700">'+pAlq+'%</span> alquilado'
+                  :'<span style="color:var(--gr);font-weight:700">100%</span> propio')
         +'</div>'
       +'</div>';
     }).join('');
@@ -764,7 +771,7 @@ function renderExecSummary() {
     document.getElementById('exec-flota-comp').innerHTML =
       '<h3 style="margin-bottom:14px">🚛 Composición de Flota — Propio vs Alquilado'
       +'<span style="font-size:11px;font-weight:400;color:var(--tx2);margin-left:10px">Flota activa: '+totalFlota+' unidades</span>'
-      +'<span style="float:right;font-size:11px;font-weight:600;color:var(--rd);background:rgba(248,81,73,.12);padding:2px 10px;border-radius:10px">'+totalAlq+' alquiladas ('+pctAlqTotal+'%)</span>'
+      +'<span style="float:right;font-size:11px;font-weight:600;color:var(--rd);background:rgba(248,81,73,.12);padding:2px 10px;border-radius:10px">'+totalAlq+' alquiladas ('+pctAlqT+'%)</span>'
       +'</h3>'
       +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px">'+cards+'</div>';
   })();
@@ -1143,27 +1150,183 @@ function renderAll(){
 Chart.register(ChartDataLabels);
 
 
-// ─── SharePoint / OneDrive auto-load ─────────────────────────────────────────
-const SP_URL = 'https://empcarhuamayo-my.sharepoint.com/:x:/p/sramos/IQAHcEG2Y1X4Q6UDEko2w_gkAaTURbR3Sw3SdGg63muQzDs?e=jeH9Jy&download=1';
+// ─── Google Sheets auto-load (dinámico, incluye composición de flota) ───────
+const GSHEET_ID   = '1Q7X0sWCiK4aDmDykSj0Y9FWRRW7G0hM3RnEuDd_l2nc';
+const GSHEET_XLSX = 'https://docs.google.com/spreadsheets/d/'+GSHEET_ID+'/export?format=xlsx';
+
+// Fallback fleet data (se sobreescribe con datos reales al actualizar)
+let FLEET_DATA = {"Baranda": {"total": 2, "alquiler": 0, "propio": 2, "placas_alq": [], "placas_pro": ["CLT-869", "CLS-882"]}, "CRC": {"total": 25, "alquiler": 6, "propio": 19, "placas_alq": ["BPZ-811", "BKX-788", "BFP-881", "VBD-813", "CJT-865", "VCW-820"], "placas_pro": ["BLG-813", "BLH-841", "BLJ-916", "BSY-760", "BMO-824", "BNM-857", "BNA-754", "BML-833", "BMN-758", "CEU-923", "CFD-787", "CJH-714", "CJH-785", "CJH-881", "CJJ-709", "CJL-877", "CLU-822", "CMS-761", "CMS-732"]}, "Camion_Grua": {"total": 11, "alquiler": 0, "propio": 11, "placas_alq": [], "placas_pro": ["BSB-832", "BWC-801", "BEG-763", "BFR-871", "BKE-776", "BRH-713", "BRJ-742", "BZC-719", "CDC-719", "CKK-761", "CLC-743"]}, "Camioneta": {"total": 2, "alquiler": 0, "propio": 2, "placas_alq": [], "placas_pro": ["BRY-703", "CDE-927"]}, "Cisterna Agua": {"total": 2, "alquiler": 2, "propio": 0, "placas_alq": ["CDI-864", "CFW-811"], "placas_pro": []}, "Minivan": {"total": 1, "alquiler": 0, "propio": 1, "placas_alq": [], "placas_pro": ["BPX-938"]}};
 
 async function loadFromSharePoint() {
-  const btn = document.getElementById('btnRefresh');
+  const btn    = document.getElementById('btnRefresh');
   const status = document.getElementById('fileStatus');
-  btn.textContent = '⏳ Conectando...';
+  btn.textContent = '⏳ Actualizando...';
   btn.disabled = true;
-  status.textContent = 'Intentando cargar desde SharePoint...';
+  status.textContent = 'Descargando datos desde Google Sheets...';
   try {
-    const resp = await fetch(SP_URL, {mode:'cors', credentials:'include'});
-    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    // Download full XLSX — includes BD26 + parqueo_vehiculos
+    const resp = await fetch(GSHEET_XLSX + '&t=' + Date.now(), {cache:'no-store'});
+    if (!resp.ok) throw new Error('HTTP '+resp.status);
     const buf = await resp.arrayBuffer();
-    processExcelBuffer(buf, 'SharePoint (BD26)');
+
+    // Parse with SheetJS (already loaded)
+    const wb = XLSX.read(buf, {type:'array', cellDates:true});
+
+    // ── Parse BD26 ──────────────────────────────────────────────────────────
+    const wsBD26 = wb.Sheets['BD26'] || wb.Sheets[wb.SheetNames[0]];
+    const jsonBD = XLSX.utils.sheet_to_json(wsBD26, {raw:false, defval:null});
+    const nd = [];
+    jsonBD.forEach(row => {
+      const placa  = (row['PLACA']||row['Placa']||'').trim();
+      const unidad = (row['Unidad']||'').toString().trim();
+      if (!placa || unidad==='Grua' || placa.endsWith('G')) return;
+      const fecha = row['Fecha'] ? new Date(row['Fecha']) : null;
+      if (!fecha || isNaN(fecha)) return;
+      const fs  = fecha.toISOString().split('T')[0];
+      const val = (row['Valorizado']||'').toString().trim().toLowerCase();
+      nd.push({
+        fecha:fs, placa_n:placa,
+        mfact:row['M fact']||'', cliente:row['Cliente']||'',
+        proyecto:(row['Proyecto']||''), tareo:row['Tareo_tarifario']||'',
+        status:row['Status']||'', obs:row['Observaciones']||null,
+        op:Number(row['Operativo'])||0, inop:Number(row['Inoperativo'])||0,
+        obs_op:row['Observaciones Operaciones']||null, val,
+        semana:getWeek(fs), anio:fecha.getFullYear(), mes:fecha.getMonth()+1,
+        utipo:unidad||'Sin clasificar'
+      });
+    });
+
+    // ── Parse parqueo_vehiculos → composición de flota ──────────────────────
+    const parkSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('parqueo')) || null;
+    if (parkSheetName) {
+      const wsPark  = wb.Sheets[parkSheetName];
+      const jsonPark = XLSX.utils.sheet_to_json(wsPark, {raw:false, defval:null});
+      const newFleet = {};
+      jsonPark.forEach(row => {
+        const placa  = (row['Placa']||'').trim();
+        const tipo   = (row['Tipo']||'').trim();
+        const estado = (row['Estado']||'').trim().toUpperCase();
+        const terc   = (row['Terceros']||'').trim();
+        if (!placa || !tipo || estado !== 'ACTIVO' || tipo === 'Grua') return;
+        if (!newFleet[tipo]) newFleet[tipo] = {total:0, alquiler:0, propio:0, placas_alq:[], placas_pro:[]};
+        newFleet[tipo].total++;
+        if (terc.toLowerCase() === 'x') {
+          newFleet[tipo].alquiler++;
+          newFleet[tipo].placas_alq.push(placa);
+        } else {
+          newFleet[tipo].propio++;
+          newFleet[tipo].placas_pro.push(placa);
+        }
+      });
+      if (Object.keys(newFleet).length > 0) {
+        FLEET_DATA = newFleet;
+        console.log('Composición de flota actualizada desde parqueo_vehiculos:', FLEET_DATA);
+      }
+    }
+
+    // ── Update dashboard ─────────────────────────────────────────────────────
+    if (nd.length > 0) {
+      RAW.length = 0; nd.forEach(r => RAW.push(r));
+      initFilters(); applyFilters();
+      const now = new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
+      status.textContent = '✓ '+nd.length+' registros | Google Sheets | '+now;
+      document.getElementById('lastUpdate').textContent = 'Google Sheets | '+now;
+    } else {
+      status.textContent = '⚠ Sin datos válidos en BD26';
+    }
   } catch(err) {
-    // CORS blocked or auth required — open the file for manual download
-    status.innerHTML = '<span style="color:var(--yw)">⚠ Acceso directo bloqueado (CORS/Auth). '
-      +'<a href="'+SP_URL+'" target="_blank" style="color:var(--ac2);text-decoration:underline">Abrir en SharePoint</a> '
-      +'→ descarga y carga con 📂</span>';
+    console.error(err);
+    status.innerHTML = '<span style="color:var(--rd)">✗ Error: '+err.message
+      +' — <a href="https://empcarhuamayo-my.sharepoint.com/:x:/p/sramos/IQAHcEG2Y1X4Q6UDEko2w_gkAaTURbR3Sw3SdGg63muQzDs?e=jeH9Jy" target="_blank" style="color:var(--ac2);text-decoration:underline">Abrir en SharePoint</a></span>';
+  } finally {
     btn.textContent = '🔄 Actualizar';
     btn.disabled = false;
+  }
+}
+
+
+function csvToRows(csvText) {
+  // Simple CSV parser handling quoted fields with commas/newlines
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for (let i = 0; i < csvText.length; i++) {
+    const c = csvText[i], n = csvText[i+1];
+    if (inQuotes) {
+      if (c === '"' && n === '"') { field += '"'; i++; }
+      else if (c === '"') { inQuotes = false; }
+      else { field += c; }
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field=''; }
+      else if (c === '\r') { /* skip */ }
+      else if (c === '\n') { row.push(field); rows.push(row); row=[]; field=''; }
+      else field += c;
+    }
+  }
+  if (field.length>0 || row.length>0) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+function processCsvText(csvText, sourceName) {
+  const status = document.getElementById('fileStatus');
+  try {
+    const rows = csvToRows(csvText).filter(r => r.length>1 && r.some(c=>c!==''));
+    const headers = rows[0].map(h2=>h2.trim());
+    const idx = {};
+    headers.forEach((h2,i)=>{ idx[h2]=i; });
+
+    function col(row, name) {
+      const i = idx[name];
+      return i!==undefined ? (row[i]||'').trim() : '';
+    }
+
+    const nd = [];
+    for (let r = 1; r < rows.length; r++) {
+      const row = rows[r];
+      if (!row || row.length < 3) continue;
+      const placa  = col(row,'PLACA');
+      const unidad = col(row,'Unidad');
+      if (!placa || unidad === 'Grua' || placa.endsWith('G')) continue;
+
+      const fechaRaw = col(row,'Fecha');
+      if (!fechaRaw) continue;
+      // Parse M/D/YYYY or YYYY-MM-DD
+      let fecha;
+      if (fechaRaw.includes('/')) {
+        const parts = fechaRaw.split('/');
+        fecha = new Date(Number(parts[2]), Number(parts[0])-1, Number(parts[1]));
+      } else {
+        fecha = new Date(fechaRaw);
+      }
+      if (isNaN(fecha)) continue;
+      const fs = fecha.toISOString().split('T')[0];
+
+      const val = col(row,'Valorizado').toLowerCase();
+      const uti = unidad || 'Sin clasificar';
+
+      nd.push({
+        fecha: fs, placa_n: placa,
+        mfact: col(row,'M fact'), cliente: col(row,'Cliente'),
+        proyecto: col(row,'Proyecto'), tareo: col(row,'Tareo_tarifario'),
+        status: col(row,'Status'), obs: col(row,'Observaciones')||null,
+        op: Number(col(row,'Operativo'))||0, inop: Number(col(row,'Inoperativo'))||0,
+        obs_op: col(row,'Observaciones Operaciones')||null, val,
+        semana: getWeek(fs), anio: fecha.getFullYear(), mes: fecha.getMonth()+1, utipo: uti
+      });
+    }
+
+    if (nd.length > 0) {
+      RAW.length = 0; nd.forEach(r => RAW.push(r));
+      initFilters(); applyFilters();
+      const now = new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
+      status.textContent = '✓ '+nd.length+' registros | '+sourceName+' | '+now;
+      document.getElementById('lastUpdate').textContent = 'Fuente: '+sourceName+' | '+now;
+    } else {
+      status.textContent = '⚠ Sin datos válidos en la hoja';
+    }
+  } catch(err) {
+    status.textContent = '✗ Error al procesar CSV';
+    console.error(err);
   }
 }
 
@@ -1286,25 +1449,31 @@ function renderEstado() {
     +'<div class="di" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--brd)"><div class="dk">Val. Efectiva</div>'
     +'<div class="dv" style="color:'+(p.pctVal>=80?'var(--gr)':'var(--rd)')+'"><b>'+p.pctVal+'%</b></div></div>';
 
-  // Composición de flota
+  // Composición de flota (mismo orden + FLEET_DATA global)
   (function(){
-    var FD2={"CRC":{"total":23,"alquiler":6,"propio":17,"placas_alq":["BPZ-811","BKX-788","BFP-881","VBD-813","CJT865","VCW-820"],"placas_pro":["BLG-813","BLH-841","BLJ-916","BSY-760","BMO-824","BNM-857","BNA-754","BML-833","BMN-758","CEU-923","CFD-787","CJH-714","CJH-785","CJH-881","CJJ-709","CJL-877","CLU-822"]},"Camion_Grua":{"total":11,"alquiler":0,"propio":11,"placas_alq":[],"placas_pro":["BSB-832","BWC-801","BEG-763","BFR-871","BKE-776","BRH-713","BRJ-742","BZC-719","CDC-719","CKK-761","CLC-743"]},"Cisterna Agua":{"total":2,"alquiler":2,"propio":0,"placas_alq":["CDI-864","CFW-811"],"placas_pro":[]},"Camioneta":{"total":4,"alquiler":1,"propio":3,"placas_alq":["COMERCIAL"],"placas_pro":["BRY-703","CDE-927","TALLER"]},"Baranda":{"total":2,"alquiler":0,"propio":2,"placas_alq":[],"placas_pro":["CLT-869","CLS-882"]},"Minivan":{"total":1,"alquiler":0,"propio":1,"placas_alq":[],"placas_pro":["BPX-938"]}};
-    var icons={'CRC':'🚛','Camion_Grua':'🏗️','Cisterna Agua':'💧','Camioneta':'🚙','Baranda':'🚚','Minivan':'🚐'};
-    var labels={'CRC':'CRC','Camion_Grua':'Camión Grúa','Cisterna Agua':'Cisterna Agua','Camioneta':'Camioneta','Baranda':'Baranda','Minivan':'Minivan'};
-    var tipos=Object.keys(FD2);
-    var totFlota=tipos.reduce(function(a,t){return a+FD2[t].total;},0);
-    var totAlq=tipos.reduce(function(a,t){return a+FD2[t].alquiler;},0);
+    var d = FLEET_DATA;
+    var TIPO_ORDER  = ['CRC','Camion_Grua','Cisterna Agua','Baranda','Camioneta','Minivan'];
+    var TIPO_LABELS = {'CRC':'CRC','Camion_Grua':'Camión Grúa','Cisterna Agua':'Cisterna Agua','Baranda':'Baranda','Camioneta':'Camioneta','Minivan':'Minivan'};
+    var TIPO_ICONS  = {'CRC':'🚛','Camion_Grua':'🏗️','Cisterna Agua':'💧','Baranda':'🚚','Camioneta':'🚙','Minivan':'🚐'};
+    var tipos = TIPO_ORDER.filter(function(t){ return d[t]&&d[t].total>0; });
+    Object.keys(d).forEach(function(t){ if(tipos.indexOf(t)===-1&&d[t].total>0) tipos.push(t); });
+    var totFlota=tipos.reduce(function(a,t){return a+(d[t]?d[t].total:0);},0);
+    var totAlq  =tipos.reduce(function(a,t){return a+(d[t]?d[t].alquiler:0);},0);
     var pctA=totFlota>0?Math.round(totAlq/totFlota*100):0;
     var cards=tipos.map(function(tipo){
-      var d=FD2[tipo],pAlq=d.total>0?Math.round(d.alquiler/d.total*100):0,pPro=100-pAlq;
+      var info=d[tipo]||{total:0,alquiler:0,propio:0,placas_alq:[],placas_pro:[]};
+      var pAlq=info.total>0?Math.round(info.alquiler/info.total*100):0,pPro=100-pAlq;
       var alqCol=pAlq>0?'var(--rd)':'var(--tx2)';
       var alqBg=pAlq>0?'rgba(248,81,73,.08)':'rgba(63,185,80,.04)';
       var alqBrd=pAlq>0?'rgba(248,81,73,.2)':'rgba(63,185,80,.1)';
+      var tipAlq=info.placas_alq&&info.placas_alq.length>0?info.placas_alq.join(', '):'—';
+      var tipPro=info.placas_pro&&info.placas_pro.length>0?info.placas_pro.join(', '):'—';
+      var icon=TIPO_ICONS[tipo]||'🚛'; var lbl=TIPO_LABELS[tipo]||tipo;
       return '<div style="background:var(--sur2);border:1px solid var(--brd);border-radius:10px;padding:14px">'
         +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
-          +'<span style="font-size:20px">'+(icons[tipo]||'🚛')+'</span>'
-          +'<div><div style="font-size:12px;font-weight:700">'+(labels[tipo]||tipo)+'</div>'
-          +'<div style="font-size:10px;color:var(--tx2)">'+d.total+' unidades</div></div>'
+          +'<span style="font-size:20px">'+icon+'</span>'
+          +'<div><div style="font-size:12px;font-weight:700">'+lbl+'</div>'
+          +'<div style="font-size:10px;color:var(--tx2)">'+info.total+' unidades</div></div>'
         +'</div>'
         +'<div style="height:8px;background:var(--sur3);border-radius:4px;overflow:hidden;margin-bottom:8px">'
           +'<div style="display:flex;height:100%">'
@@ -1316,12 +1485,12 @@ function renderEstado() {
           +'<span>Propio ('+pPro+'%)</span><span>Alquiler ('+pAlq+'%)</span>'
         +'</div>'
         +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
-          +'<div style="text-align:center;background:rgba(63,185,80,.08);border:1px solid rgba(63,185,80,.2);border-radius:6px;padding:6px" title="'+d.placas_pro.join(', ')+'">'
-            +'<div style="font-size:18px;font-weight:800;color:var(--gr)">'+d.propio+'</div>'
+          +'<div style="text-align:center;background:rgba(63,185,80,.08);border:1px solid rgba(63,185,80,.2);border-radius:6px;padding:6px" title="'+tipPro+'">'
+            +'<div style="font-size:18px;font-weight:800;color:var(--gr)">'+info.propio+'</div>'
             +'<div style="font-size:9px;color:var(--tx2);text-transform:uppercase">Propios</div>'
           +'</div>'
-          +'<div style="text-align:center;background:'+alqBg+';border:1px solid '+alqBrd+';border-radius:6px;padding:6px" title="'+(d.placas_alq.join(', ')||'—')+'">'
-            +'<div style="font-size:18px;font-weight:800;color:'+alqCol+'">'+d.alquiler+'</div>'
+          +'<div style="text-align:center;background:'+alqBg+';border:1px solid '+alqBrd+';border-radius:6px;padding:6px" title="'+tipAlq+'">'
+            +'<div style="font-size:18px;font-weight:800;color:'+alqCol+'">'+info.alquiler+'</div>'
             +'<div style="font-size:9px;color:var(--tx2);text-transform:uppercase">Alquilados</div>'
           +'</div>'
         +'</div>'
