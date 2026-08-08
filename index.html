@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard Operatividad de Flota — CARHUAMAYO</title>
-<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/dist/msal-browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -1171,8 +1171,31 @@ let FLEET_DATA = {"CRC":{"total":25,"alquiler":6,"propio":19,"placas_alq":["BPZ-
 
 let _msalApp = null;
 
+async function _loadMsalIfNeeded() {
+  if (window.msal) return true;
+  // Try loading MSAL dynamically if CDN failed
+  return new Promise((resolve) => {
+    const cdns = [
+      'https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/dist/msal-browser.min.js',
+      'https://unpkg.com/@azure/msal-browser@3.28.1/dist/msal-browser.min.js'
+    ];
+    let tried = 0;
+    function tryNext() {
+      if (tried >= cdns.length) { resolve(false); return; }
+      const s = document.createElement('script');
+      s.src = cdns[tried++];
+      s.onload = () => resolve(true);
+      s.onerror = tryNext;
+      document.head.appendChild(s);
+    }
+    tryNext();
+  });
+}
+
 async function _getMsalApp() {
   if (_msalApp) return _msalApp;
+  const loaded = await _loadMsalIfNeeded();
+  if (!loaded || !window.msal) throw new Error('No se pudo cargar la librería de autenticación (MSAL). Verifica tu conexión a internet e intenta de nuevo.');
   const cfg = {
     auth: {
       clientId:   MS_CONFIG.clientId,
@@ -1209,8 +1232,6 @@ async function loadFromSharePoint() {
   status.textContent = 'Iniciando sesión Microsoft 365...';
 
   try {
-    if (!window.msal) throw new Error('MSAL no cargado. Verifica conexión.');
-
     const token = await _getToken();
     status.textContent = 'Descargando archivo desde SharePoint...';
 
