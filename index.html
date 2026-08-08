@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard Operatividad de Flota — Carhuamayo</title>
+<title>Dashboard Operatividad de Flota — CARHUAMAYO</title>
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -226,7 +227,7 @@ tr:hover td{background:var(--sur2)}
   <div class="sep"></div>
   <button class="btn btn-g" onclick="resetFilters()">↺ Limpiar</button>
   <div style="margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-    <button id="btnRefresh" class="btn btn-p" onclick="loadFromSharePoint()" title="Carga automática desde Google Sheets">🔄 Actualizar</button>
+    <button id="btnRefresh" class="btn btn-p" onclick="loadFromSharePoint()" title="Actualizar desde SharePoint vía Microsoft 365">🔄 Actualizar</button>
     <label for="fileInput" class="btn btn-g" style="cursor:pointer">📂 Cargar Excel</label>
     <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="loadExcelFile(event)" style="display:none">
     <a href="https://empcarhuamayo-my.sharepoint.com/:x:/p/sramos/IQAHcEG2Y1X4Q6UDEko2w_gkAaTURbR3Sw3SdGg63muQzDs?e=jeH9Jy" target="_blank" class="btn btn-g" title="Abrir archivo en SharePoint">📋 SharePoint</a>
@@ -1018,7 +1019,13 @@ function renderFlota() {
   TIPO_ORDER.forEach(function(tipo) {
     var items = byTipo[tipo];
     if(!items||!items.length) return;
-    items.sort(function(a,b){return a.placa.localeCompare(b.placa);});
+    // Ordenar por proyecto, luego por placa dentro del mismo proyecto
+    items.sort(function(a,b){
+      var pa=(a.r.proyecto||'').trim().toLowerCase();
+      var pb=(b.r.proyecto||'').trim().toLowerCase();
+      if(pa!==pb) return pa.localeCompare(pb);
+      return a.placa.localeCompare(b.placa);
+    });
     var opCount   = items.filter(function(x){return Number(x.r.op)===1;}).length;
     var inopCount = items.length - opCount;
     var tipoLbl   = TIPO_LABELS[tipo]||tipo;
@@ -1150,31 +1157,85 @@ function renderAll(){
 Chart.register(ChartDataLabels);
 
 
-// ─── Google Sheets auto-load (dinámico, incluye composición de flota) ───────
-const GSHEET_ID   = '1Q7X0sWCiK4aDmDykSj0Y9FWRRW7G0hM3RnEuDd_l2nc';
-const GSHEET_XLSX = 'https://docs.google.com/spreadsheets/d/'+GSHEET_ID+'/export?format=xlsx';
+// ─── Microsoft Graph API + MSAL (SharePoint auto-load) ──────────────────────
+const MS_CONFIG = {
+  clientId: 'd051871b-939c-4fc4-93eb-5adb4d527799',
+  tenantId: 'e9ffdc9f-e1f8-4aaa-bf60-061cc1a77987',
+  authority: 'https://login.microsoftonline.com/e9ffdc9f-e1f8-4aaa-bf60-061cc1a77987',
+  scopes: ['Files.Read','Sites.Read.All','User.Read'],
+  fileUrl: 'https://empcarhuamayo-my.sharepoint.com/:x:/p/sramos/IQAHcEG2Y1X4Q6UDEko2w_gkAaTURbR3Sw3SdGg63muQzDs?e=jeH9Jy'
+};
 
 // Fallback fleet data (se sobreescribe con datos reales al actualizar)
-let FLEET_DATA = {"Baranda": {"total": 2, "alquiler": 0, "propio": 2, "placas_alq": [], "placas_pro": ["CLT-869", "CLS-882"]}, "CRC": {"total": 25, "alquiler": 6, "propio": 19, "placas_alq": ["BPZ-811", "BKX-788", "BFP-881", "VBD-813", "CJT-865", "VCW-820"], "placas_pro": ["BLG-813", "BLH-841", "BLJ-916", "BSY-760", "BMO-824", "BNM-857", "BNA-754", "BML-833", "BMN-758", "CEU-923", "CFD-787", "CJH-714", "CJH-785", "CJH-881", "CJJ-709", "CJL-877", "CLU-822", "CMS-761", "CMS-732"]}, "Camion_Grua": {"total": 11, "alquiler": 0, "propio": 11, "placas_alq": [], "placas_pro": ["BSB-832", "BWC-801", "BEG-763", "BFR-871", "BKE-776", "BRH-713", "BRJ-742", "BZC-719", "CDC-719", "CKK-761", "CLC-743"]}, "Camioneta": {"total": 2, "alquiler": 0, "propio": 2, "placas_alq": [], "placas_pro": ["BRY-703", "CDE-927"]}, "Cisterna Agua": {"total": 2, "alquiler": 2, "propio": 0, "placas_alq": ["CDI-864", "CFW-811"], "placas_pro": []}, "Minivan": {"total": 1, "alquiler": 0, "propio": 1, "placas_alq": [], "placas_pro": ["BPX-938"]}};
+let FLEET_DATA = {"CRC":{"total":25,"alquiler":6,"propio":19,"placas_alq":["BPZ-811","BKX-788","BFP-881","VBD-813","CJT-865","VCW-820"],"placas_pro":["BLG-813","BLH-841","BLJ-916","BSY-760","BMO-824","BNM-857","BNA-754","BML-833","BMN-758","CEU-923","CFD-787","CJH-714","CJH-785","CJH-881","CJJ-709","CJL-877","CLU-822","CMS-761","CMS-732"]},"Camion_Grua":{"total":11,"alquiler":0,"propio":11,"placas_alq":[],"placas_pro":["BSB-832","BWC-801","BEG-763","BFR-871","BKE-776","BRH-713","BRJ-742","BZC-719","CDC-719","CKK-761","CLC-743"]},"Cisterna Agua":{"total":2,"alquiler":2,"propio":0,"placas_alq":["CDI-864","CFW-811"],"placas_pro":[]},"Baranda":{"total":2,"alquiler":0,"propio":2,"placas_alq":[],"placas_pro":["CLT-869","CLS-882"]},"Camioneta":{"total":2,"alquiler":0,"propio":2,"placas_alq":[],"placas_pro":["BRY-703","CDE-927"]},"Minivan":{"total":1,"alquiler":0,"propio":1,"placas_alq":[],"placas_pro":["BPX-938"]}};
+
+let _msalApp = null;
+
+async function _getMsalApp() {
+  if (_msalApp) return _msalApp;
+  const cfg = {
+    auth: {
+      clientId:   MS_CONFIG.clientId,
+      authority:  MS_CONFIG.authority,
+      redirectUri: window.location.origin + window.location.pathname
+    },
+    cache: { cacheLocation:'sessionStorage', storeAuthStateInCookie:false }
+  };
+  _msalApp = new msal.PublicClientApplication(cfg);
+  await _msalApp.initialize();
+  return _msalApp;
+}
+
+async function _getToken() {
+  const app = await _getMsalApp();
+  const req = { scopes: MS_CONFIG.scopes };
+  // Try silent first
+  const accounts = app.getAllAccounts();
+  if (accounts.length > 0) {
+    try {
+      const r = await app.acquireTokenSilent({...req, account: accounts[0]});
+      return r.accessToken;
+    } catch(e) { /* fall through to popup */ }
+  }
+  const r = await app.acquireTokenPopup(req);
+  return r.accessToken;
+}
 
 async function loadFromSharePoint() {
   const btn    = document.getElementById('btnRefresh');
   const status = document.getElementById('fileStatus');
-  btn.textContent = '⏳ Actualizando...';
+  btn.textContent = '⏳ Conectando...';
   btn.disabled = true;
-  status.textContent = 'Descargando datos desde Google Sheets...';
-  try {
-    // Download full XLSX — includes BD26 + parqueo_vehiculos
-    const resp = await fetch(GSHEET_XLSX + '&t=' + Date.now(), {cache:'no-store'});
-    if (!resp.ok) throw new Error('HTTP '+resp.status);
-    const buf = await resp.arrayBuffer();
+  status.textContent = 'Iniciando sesión Microsoft 365...';
 
-    // Parse with SheetJS (already loaded)
+  try {
+    if (!window.msal) throw new Error('MSAL no cargado. Verifica conexión.');
+
+    const token = await _getToken();
+    status.textContent = 'Descargando archivo desde SharePoint...';
+
+    // Encode sharing URL for Graph API
+    const encoded = btoa(MS_CONFIG.fileUrl)
+      .replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+    const graphUrl = 'https://graph.microsoft.com/v1.0/shares/u!' + encoded + '/driveItem/content';
+
+    const resp = await fetch(graphUrl, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (!resp.ok) {
+      const txt = await resp.text();
+      throw new Error('Graph API HTTP ' + resp.status + ': ' + txt.slice(0,200));
+    }
+
+    const buf = await resp.arrayBuffer();
+    status.textContent = 'Procesando archivo...';
+
+    // Parse with SheetJS
     const wb = XLSX.read(buf, {type:'array', cellDates:true});
 
-    // ── Parse BD26 ──────────────────────────────────────────────────────────
-    const wsBD26 = wb.Sheets['BD26'] || wb.Sheets[wb.SheetNames[0]];
-    const jsonBD = XLSX.utils.sheet_to_json(wsBD26, {raw:false, defval:null});
+    // ── BD26 ────────────────────────────────────────────────────────────────
+    const wsBD = wb.Sheets['BD26'] || wb.Sheets[wb.SheetNames[0]];
+    const jsonBD = XLSX.utils.sheet_to_json(wsBD, {raw:false, defval:null});
     const nd = [];
     jsonBD.forEach(row => {
       const placa  = (row['PLACA']||row['Placa']||'').trim();
@@ -1196,32 +1257,24 @@ async function loadFromSharePoint() {
       });
     });
 
-    // ── Parse parqueo_vehiculos → composición de flota ──────────────────────
-    const parkSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('parqueo')) || null;
-    if (parkSheetName) {
-      const wsPark  = wb.Sheets[parkSheetName];
+    // ── parqueo_vehiculos → FLEET_DATA dinámico ─────────────────────────────
+    const parkName = wb.SheetNames.find(n => n.toLowerCase().includes('parqueo'));
+    if (parkName) {
+      const wsPark  = wb.Sheets[parkName];
       const jsonPark = XLSX.utils.sheet_to_json(wsPark, {raw:false, defval:null});
-      const newFleet = {};
+      const nf = {};
       jsonPark.forEach(row => {
         const placa  = (row['Placa']||'').trim();
         const tipo   = (row['Tipo']||'').trim();
         const estado = (row['Estado']||'').trim().toUpperCase();
-        const terc   = (row['Terceros']||'').trim();
-        if (!placa || !tipo || estado !== 'ACTIVO' || tipo === 'Grua') return;
-        if (!newFleet[tipo]) newFleet[tipo] = {total:0, alquiler:0, propio:0, placas_alq:[], placas_pro:[]};
-        newFleet[tipo].total++;
-        if (terc.toLowerCase() === 'x') {
-          newFleet[tipo].alquiler++;
-          newFleet[tipo].placas_alq.push(placa);
-        } else {
-          newFleet[tipo].propio++;
-          newFleet[tipo].placas_pro.push(placa);
-        }
+        const terc   = (row['Terceros']||'').trim().toLowerCase();
+        if (!placa || !tipo || estado!=='ACTIVO' || tipo==='Grua') return;
+        if (!nf[tipo]) nf[tipo] = {total:0,alquiler:0,propio:0,placas_alq:[],placas_pro:[]};
+        nf[tipo].total++;
+        if (terc==='x') { nf[tipo].alquiler++; nf[tipo].placas_alq.push(placa); }
+        else            { nf[tipo].propio++;   nf[tipo].placas_pro.push(placa); }
       });
-      if (Object.keys(newFleet).length > 0) {
-        FLEET_DATA = newFleet;
-        console.log('Composición de flota actualizada desde parqueo_vehiculos:', FLEET_DATA);
-      }
+      if (Object.keys(nf).length > 0) FLEET_DATA = nf;
     }
 
     // ── Update dashboard ─────────────────────────────────────────────────────
@@ -1229,15 +1282,22 @@ async function loadFromSharePoint() {
       RAW.length = 0; nd.forEach(r => RAW.push(r));
       initFilters(); applyFilters();
       const now = new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
-      status.textContent = '✓ '+nd.length+' registros | Google Sheets | '+now;
-      document.getElementById('lastUpdate').textContent = 'Google Sheets | '+now;
+      status.textContent = '✓ ' + nd.length + ' registros | SharePoint | ' + now;
+      document.getElementById('lastUpdate').textContent = 'SharePoint (auto) | ' + now;
     } else {
       status.textContent = '⚠ Sin datos válidos en BD26';
     }
+
   } catch(err) {
     console.error(err);
-    status.innerHTML = '<span style="color:var(--rd)">✗ Error: '+err.message
-      +' — <a href="https://empcarhuamayo-my.sharepoint.com/:x:/p/sramos/IQAHcEG2Y1X4Q6UDEko2w_gkAaTURbR3Sw3SdGg63muQzDs?e=jeH9Jy" target="_blank" style="color:var(--ac2);text-decoration:underline">Abrir en SharePoint</a></span>';
+    if (err.errorCode === 'user_cancelled') {
+      status.textContent = '⚠ Login cancelado.';
+    } else if (err.errorCode === 'popup_window_error') {
+      status.innerHTML = '<span style="color:var(--yw)">⚠ Permite ventanas emergentes para este sitio e intenta de nuevo.</span>';
+    } else {
+      status.innerHTML = '<span style="color:var(--rd)">✗ ' + err.message
+        + ' — <a href="https://empcarhuamayo-my.sharepoint.com/:x:/p/sramos/IQAHcEG2Y1X4Q6UDEko2w_gkAaTURbR3Sw3SdGg63muQzDs?e=jeH9Jy" target="_blank" style="color:var(--ac2);text-decoration:underline">Abrir en SharePoint</a></span>';
+    }
   } finally {
     btn.textContent = '🔄 Actualizar';
     btn.disabled = false;
@@ -1516,7 +1576,13 @@ function renderEstado() {
   var gh='';
   TORD.forEach(function(tipo){
     var items=byT[tipo]; if(!items||!items.length) return;
-    items.sort(function(a,b){return a.placa.localeCompare(b.placa);});
+    // Ordenar por proyecto, luego por placa dentro del mismo proyecto
+    items.sort(function(a,b){
+      var pa=(a.r.proyecto||'').trim().toLowerCase();
+      var pb=(b.r.proyecto||'').trim().toLowerCase();
+      if(pa!==pb) return pa.localeCompare(pb);
+      return a.placa.localeCompare(b.placa);
+    });
     var oC=items.filter(function(x){return Number(x.r.op)===1;}).length;
     var iC=items.length-oC;
     gh+='<div style="grid-column:1/-1;margin-top:10px;margin-bottom:4px;display:flex;align-items:center;gap:8px">'
